@@ -1,2 +1,2 @@
-# PteroConsole
-The console for PteroController
+# PteroAddons
+The addons for PteroController Client / Server
