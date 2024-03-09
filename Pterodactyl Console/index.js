@@ -9,14 +9,14 @@ const rl = readline.createInterface({
   terminal: false
 });
 
-const [,, panelUrl, panelApiKey, serverUUID] = process.argv;
+const [, , panelUrl, panelApiKey, serverUUID] = process.argv;
 
 if (!panelUrl || !panelApiKey || !serverUUID) {
   console.error(`Usage: Pterodactyl.exe <panelUrl> <panelApiKey> <serverUUID>`);
   process.exit(1);
 }
 
-axios.defaults.baseURL = panelUrl; 
+axios.defaults.baseURL = panelUrl;
 
 const prod = async () => {
   try {
@@ -54,8 +54,12 @@ const prod = async () => {
           if (message.utf8Data.startsWith(`{"event":"install output"`)) {
             return console.log(color.blue(`[Pterodactyl Daemon]: ${JSON.parse(message.utf8Data).args.toString()}`));
           }
+
           if (message.utf8Data.startsWith(`{"event":"console output"`)) {
-            return console.log(JSON.parse(message.utf8Data).args.toString());
+            const output = JSON.parse(message.utf8Data).args.toString();
+            if (output !== lastUserInput) {
+              console.log(output);
+            }
           }
           if (message.utf8Data.startsWith(`{"event":"token expiring"`)) {
             connection.close();
@@ -65,23 +69,30 @@ const prod = async () => {
           if (message.utf8Data.startsWith(`{"event":"status"`)) {
             return console.log(color.yellow(`Server marked as ${JSON.parse(message.utf8Data).args.toString()}`));
           }
-          console.log(color.red(message));
         }
 
       });
+      let lastUserInput = "";
 
       rl.on('line', function (line) {
+        lastUserInput = line;
+
         if (line === 'close') {
           connection.close();
           process.exit(0);
         }
-
         if (line.startsWith('power')) {
-          return connection.sendUTF(`{"event":"set state","args":["${line.split(/ +/)[1]}"]}`);
+          const validOptions = ["stop", "restart", "start", "kill"];
+          const command = line.split(/ +/)[1];
+          if (validOptions.includes(command)) {
+            return connection.sendUTF(`{"event":"set state","args":["${line.split(/ +/)[1]}"]}`);
+          } else {
+            return console.log(`Invalid power action!\nAllowed: start,stop,restart,kill'`);
+          }
         }
-
         connection.sendUTF(`{"event":"send command","args":["${line}"]}`);
       });
+
     });
 
     client.connect(`${socket}`, null, null, { Origin: panelUrl });
